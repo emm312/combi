@@ -133,3 +133,37 @@ where
         })
     }
 }
+
+pub fn int<'a>() -> impl Parser<'a, i64> {
+    move |input: &'a str| {
+        let mut i = 0;
+        let mut res = 0;
+        let mut neg = false;
+        let mut first = true;
+        for c in input.chars() {
+            if first {
+                first = false;
+                if c == '-' {
+                    neg = true;
+                    continue;
+                }
+            }
+            if c.is_digit(10) {
+                res *= 10;
+                res += c.to_digit(10).unwrap() as i64;
+            } else {
+                break;
+            }
+            i += 1;
+        }
+        if i == 0 {
+            Err((SourceSpan {
+                start: 0,
+                end: 0,
+                file: input,
+            }, format!("Expected int")))
+        } else {
+            Ok((if neg { -res } else { res }, &input[i..]))
+        }
+    }
+}
