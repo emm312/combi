@@ -1,5 +1,41 @@
-use combi::{defs::Parser, parsers::{map, c, and_then}};
+use combi::defs::eof;
+use combi::defs::Parser;
+use combi::parsers::byte::byte_p;
+use combi::parsers::char::*;
 
 fn main() {
-    println!("{:#?}", and_then(map(c("s"), |c| c.to_uppercase()), c("n")).parse("snf"));
+    char_p('f').or(char_p('o')).test_parse("foo");
+    println!("-----");
+    char_p('f').or(char_p('o')).test_parse("oo");
+    println!("-----");
+    char_p('f').or(char_p('o')).test_parse("loo");
+    println!("-----");
+    char_p('f').and_then(char_p('o')).and_then(char_p('o')).test_parse("foo");
+    println!("-----");
+    char_p('f').and_then(char_p('o')).and_then(char_p('o')).test_parse("bar");
+    println!("-----");
+    char_p('f').and_then(char_p('o')).and_then(char_p('o')).test_parse("far");
+    println!("====");
+    let xs: &[u8] = &[23, 34, 54];
+    byte_p(23).or(byte_p(34)).test_parse(xs);
+    println!("-----");
+    let xs: &[u8] = &[34, 23, 54];
+    byte_p(23).or(byte_p(34)).test_parse(xs);
+    println!("-----");
+    let xs: &[u8] = &[22, 23, 54];
+    byte_p(23).or(byte_p(34)).test_parse(xs);
+    println!("-----");
+    int.test_parse("1234");
+    println!("-----");
+    int.test_parse("-1234");
+    println!("-----");
+    int.test_parse("-a34");
+    println!("-----");
+    string_p("foo").test_parse("foob");
+    println!("-----");
+    string_p("foo").test_parse("fofb");
+    println!("-----");
+    eof.test_parse("foob");
+    println!("-----");
+    eof.test_parse("");
 }
