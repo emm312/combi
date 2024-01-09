@@ -35,13 +35,34 @@ where
     }
 }
 
+pub fn satisfy_map<'input, S, F, B>(f: F) -> impl Parser<'input, S, B>
+where
+    F: Fn(char) -> Option<B>,
+    S: Stream<Item = char>,
+{
+    move |input: PState<'input, S>| match input.input.uncons() {
+        Some((c, xs)) => match f(c) {
+            Some(x) => Ok((
+                x,
+                PState {
+                    input: xs,
+                    location: update_pos(input.location, c),
+                },
+            )),
+            None => Err((input.location, vec![Reason::Unexpected(c.to_string())])),
+        },
+        None => Err((input.location, vec![Reason::Unexpected("EOF".to_string())])),
+    }
+}
+
 /// Returns any single character
-pub fn any_single<S>(input: PState<'_, S>) -> PResult<'_, S, char> 
-where S: Stream<Item = char>
+pub fn any_single<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+where
+    S: Stream<Item = char>,
 {
     satisfy(|_| true).parse(input)
 }
-    
+
 /// Parses any single character in `s`
 pub fn one_of<'input, S>(s: &'input str) -> impl Parser<'input, S, char>
 where
@@ -83,9 +104,7 @@ where
     move |input: PState<'input, S>| {
         let expectation = Reason::Expected(format!(
             "none_of({})",
-            s.chars()
-                .map(|x| x.to_string())
-                .collect::<String>()
+            s.chars().map(|x| x.to_string()).collect::<String>()
         ));
 
         match input.input.uncons() {
@@ -208,4 +227,87 @@ pub fn int<S: Stream<Item = char>>(state: PState<'_, S>) -> PResult<'_, S, i64> 
     })
     .named("Integer")
     .parse(state)
+}
+
+fn lex_esc_char<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+where
+    S: Stream<Item = char>,
+{
+    let (x, input) = any_single.parse(input)?;
+    match x {
+        'n' => Ok(('\n', input)),
+        'r' => Ok(('\r', input)),
+        't' => Ok(('\t', input)),
+        '\\' => Ok(('\\', input)),
+        '\'' => Ok(('\'', input)),
+        '\"' => Ok(('\"', input)),
+        '\0' => Ok(('\0', input)),
+        _ => Err((input.location, vec![])),
+    }
+}
+
+fn lex_base_char<S>(input: PState<'_, S>) -> PResult<'_, S, u32>
+where
+    S: Stream<Item = char>,
+{
+    let (x, input) = any_single(input)?;
+    match x {
+        'o' | 'O' => Ok((8, input)),
+        'x' | 'X' => Ok((16, input)),
+        _ => Err((input.location, vec![])),
+    }
+}
+
+fn lex_digits<'a, S>(base: u32) -> impl Parser<'a, S, Vec<u32>>
+where
+    S: Stream<Item = char>,
+{
+    move |input: PState<'a, S>| {
+        satisfy_map(|c| c.to_digit(base)).some().parse(input)
+    }
+}
+
+fn lex_integer<'a, S>(base: u32) -> impl Parser<'a, S, u32>
+where
+    S: Stream<Item = char>,
+{
+    move |input: PState<'a, S>| {
+        let (n, input) = lex_digits(base).parse(input)?;
+        let n = n.into_iter().fold(0, |accum, x| accum * base + x);
+        Ok((n, input))
+    }
+}
+
+fn lex_numeric<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+where
+    S: Stream<Item = char> + Copy,
+{
+    let (base, input) = lex_base_char.or_pure(10).parse(input)?;
+    let (n, input) = lex_integer(base).parse(input)?;
+    match char::from_u32(n) {
+        Some(n) => Ok((n, input)),
+        None => Err((input.location, vec![]))
+    }
+}
+
+fn lex_char_e<S>(input: PState<'_, S>) -> PResult<'_, S, (char, bool)>
+where
+    S: Stream<Item = char>,
+{
+    let (x, input) = any_single.parse(input)?;
+    if x == '\\' {
+        let (x, input) = lex_esc_char.or(lex_numeric).parse(input)?;
+        Ok(((x, true), input))
+    } else {
+        Ok(((x, false), input))
+    }
+}
+
+pub fn char_literal<S: Stream<Item = char>>(input: PState<'_, S>) -> PResult<'_, S, char> {
+    (move |input| {
+        let ((r, _), input) = lex_char_e(input)?;
+        Ok((r, input))
+    })
+    .named("Char Literal")
+    .parse(input)
 }

@@ -49,7 +49,7 @@ where
     S: Stream<Item = char>,
 {
     char('"')
-        .ignore_left(&none_of("\"").many_till(char('"')))
+        .ignore_left(&char_literal.many_till(&char('"')))
         .map(|x| x.into_iter().collect())
         .parse(input)
 }

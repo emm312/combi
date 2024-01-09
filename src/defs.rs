@@ -158,8 +158,8 @@ pub trait Parser<'a, S, T> {
     /// If intended to be ran directly by the user, instead use `parse`
     fn parse(&self, input: PState<'a, S>) -> PResult<'a, S, T>;
 
-    /// A wrapper around `run_parser`
-    /// `parser.parse(file, input)` runs the parser over `input`. `file` is used only in error messages
+    /// A wrapper around `parse`
+    /// `parser.run_parser(file, input)` runs the parser over `input`. `file` is used only in error messages
     fn run_parser(&self, file: &'a str, input: S) -> PResult<'a, S, T> {
         self.parse(PState {
             input,
@@ -196,7 +196,7 @@ pub trait Parser<'a, S, T> {
 
     /// The parser `p1.or(p2)` first applies `p1`, if it succeeds then it returns,
     /// if it fails then `p2` is ran instead
-    fn either<P, B>(&self, fallback: P) -> impl Parser<'a, S, Result<T, B>>
+    fn either<P, B>(&self, fallback: &P) -> impl Parser<'a, S, Result<T, B>>
     where
         S: Copy,
         P: Parser<'a, S, B>,
@@ -313,21 +313,21 @@ pub trait Parser<'a, S, T> {
     }
 
     /// Parses self multiple times until `till` parses
-    fn many_till<P, B>(&self, till: P) -> impl Parser<'a, S, Vec<T>>
+    fn many_till<P, B>(&self, till: &P) -> impl Parser<'a, S, Vec<T>>
     where
         P: Parser<'a, S, B>,
         S: Copy,
+        Self: Sized,
     {
         // RC'd to use either for better parser errors
-        let till = Rc::new(till);
         move |mut input| {
             let mut out: Vec<T> = Vec::new();
 
             loop {
-                let (x, xs) = self.either(till.clone()).parse(input)?;
+                let (x, xs) = till.either(self).parse(input)?;
                 match x {
-                    Ok(v) => out.push(v),
-                    Err(_) => return Ok((out, xs)),
+                    Err(v) => out.push(v),
+                    Ok(_) => return Ok((out, xs)),
                 }
 
                 input = xs;

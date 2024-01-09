@@ -38,4 +38,6 @@ fn main() {
     eof.test_parse("foob");
     println!("-----");
     eof.test_parse("");
+    println!("-----");
+    char_literal.test_parse("\\\"");
 }
