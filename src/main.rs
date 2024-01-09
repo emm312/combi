@@ -4,17 +4,17 @@ use combi::parsers::byte::byte_p;
 use combi::parsers::char::*;
 
 fn main() {
-    char_p('f').or(char_p('o')).test_parse("foo");
+    char('f').or(char('o')).test_parse("foo");
     println!("-----");
-    char_p('f').or(char_p('o')).test_parse("oo");
+    char('f').or(char('o')).test_parse("oo");
     println!("-----");
-    char_p('f').or(char_p('o')).test_parse("loo");
+    char('f').or(char('o')).test_parse("loo");
     println!("-----");
-    char_p('f').and_then(char_p('o')).and_then(char_p('o')).test_parse("foo");
+    char('f').and_then(char('o')).and_then(char('o')).test_parse("foo");
     println!("-----");
-    char_p('f').and_then(char_p('o')).and_then(char_p('o')).test_parse("bar");
+    char('f').and_then(char('o')).and_then(char('o')).test_parse("bar");
     println!("-----");
-    char_p('f').and_then(char_p('o')).and_then(char_p('o')).test_parse("far");
+    char('f').and_then(char('o')).and_then(char('o')).test_parse("far");
     println!("====");
     let xs: &[u8] = &[23, 34, 54];
     byte_p(23).or(byte_p(34)).test_parse(xs);
@@ -31,9 +31,9 @@ fn main() {
     println!("-----");
     int.test_parse("-a34");
     println!("-----");
-    string_p("foo").test_parse("foob");
+    string("foo").test_parse("foob");
     println!("-----");
-    string_p("foo").test_parse("fofb");
+    string("foo").test_parse("fofb");
     println!("-----");
     eof.test_parse("foob");
     println!("-----");
