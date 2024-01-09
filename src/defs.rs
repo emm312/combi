@@ -1,6 +1,6 @@
 use std::{fmt::Debug, path::Path};
 
-use itertools::Itertools;
+use crate::util::DedupI;
 
 /// Can be seen as sort of a copyable iterator, analogous to
 /// uncons operations in other functional languages.
