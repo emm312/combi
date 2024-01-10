@@ -9,7 +9,7 @@ In addition, combi also has built in parsers for bytes and characters.
 - Unicode support *
 - Built in parsers for things like integers
 
-\* The unicode support is fairly new but needs more testing
+\* The unicode support is fairly new and needs more testing
 
 # TODO
 - [ ] Add more builtin parsers (identifiers, floats, strings)
