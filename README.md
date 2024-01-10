@@ -17,4 +17,3 @@ In addition, combi also has built in parsers for bytes and characters.
 - [ ] Documentation
 - [ ] A small tutorial for new users
 - [ ] Error recovery
-- [*] User-defined error types
