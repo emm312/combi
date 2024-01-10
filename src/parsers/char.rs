@@ -1,3 +1,5 @@
+use std::ops::{Bound, RangeBounds};
+
 use crate::defs::*;
 
 fn update_pos(pos: SourceLoc, c: char) -> SourceLoc {
@@ -136,6 +138,90 @@ where
     satisfy(move |x| x == c).named(&c.to_string())
 }
 
+/// Parses any single character but `c`
+pub fn not_char<'input, S>(c: char) -> impl Parser<'input, S, char>
+where
+    S: Stream<Item = char>,
+{
+    satisfy(move |x| x != c).named(&format!("not({c})"))
+}
+
+pub fn succ(c: char) -> char {
+    (c as u8 + 1) as char 
+}
+
+pub fn pred(c: char) -> char {
+    (c as u8 - 1) as char 
+}
+
+pub fn range<'input, S>(range: impl RangeBounds<char>) -> impl Parser<'input, S, char>
+where
+    S: Stream<Item = char>,
+{
+    move |input| {
+        let (c, input) = any_single(input)?;
+        if range.contains(&c) {
+            Ok((c, input))
+        } else {
+            match (range.start_bound(), range.end_bound()) {
+                (Bound::Excluded(l), Bound::Excluded(r)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[{}-{}]", succ(*l), pred(*r)))])),
+                (Bound::Excluded(l), Bound::Included(r)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[{}-{}]", succ(*l), r))])),
+                (Bound::Excluded(c), Bound::Unbounded) =>
+                    Err((input.location, vec![Reason::Expected(format!("[{}-]", succ(*c)))])),
+                (Bound::Included(l), Bound::Excluded(r)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[{}-{}]", l, pred(*r)))])),
+                (Bound::Included(l), Bound::Included(r)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[{}-{}]", l, r))])),
+                (Bound::Included(c), Bound::Unbounded) =>
+                    Err((input.location, vec![Reason::Expected(format!("[{}-]", c))])),
+                (Bound::Unbounded, Bound::Excluded(c)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[-{}]", pred(*c)))])),
+                (Bound::Unbounded, Bound::Included(c)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[-{}]", c))])),
+                (Bound::Unbounded, Bound::Unbounded) =>
+                    Err((input.location, vec![])),
+
+            }
+        }
+    }
+}
+
+pub fn not_range<'input, S>(range: impl RangeBounds<char>) -> impl Parser<'input, S, char>
+where
+    S: Stream<Item = char>,
+{
+    move |input| {
+        let (c, input) = any_single(input)?;
+        if !range.contains(&c) {
+            Ok((c, input))
+        } else {
+            match (range.start_bound(), range.end_bound()) {
+                (Bound::Excluded(l), Bound::Excluded(r)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[^{}-{}]", succ(*l), pred(*r)))])),
+                (Bound::Excluded(l), Bound::Included(r)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[^{}-{}]", succ(*l), r))])),
+                (Bound::Excluded(c), Bound::Unbounded) =>
+                    Err((input.location, vec![Reason::Expected(format!("[^{}-]", succ(*c)))])),
+                (Bound::Included(l), Bound::Excluded(r)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[^{}-{}]", l, pred(*r)))])),
+                (Bound::Included(l), Bound::Included(r)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[^{}-{}]", l, r))])),
+                (Bound::Included(c), Bound::Unbounded) =>
+                    Err((input.location, vec![Reason::Expected(format!("[^{}-]", c))])),
+                (Bound::Unbounded, Bound::Excluded(c)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[^-{}]", pred(*c)))])),
+                (Bound::Unbounded, Bound::Included(c)) =>
+                    Err((input.location, vec![Reason::Expected(format!("[^-{}]", c))])),
+                (Bound::Unbounded, Bound::Unbounded) =>
+                    Err((input.location, vec![])),
+
+            }
+        }
+    }
+}
+
 /// Parses a sequence of characters provided by `s`
 pub fn string<'input, S>(s: &'input str) -> impl Parser<'input, S, &'input str>
 where
@@ -262,12 +348,10 @@ fn lex_digits<'a, S>(base: u32) -> impl Parser<'a, S, Vec<u32>>
 where
     S: Stream<Item = char>,
 {
-    move |input: PState<'a, S>| {
-        satisfy_map(|c| c.to_digit(base)).some().parse(input)
-    }
+    move |input: PState<'a, S>| satisfy_map(|c| c.to_digit(base)).some().parse(input)
 }
 
-fn lex_integer<'a, S>(base: u32) -> impl Parser<'a, S, u32>
+pub fn lex_integer<'a, S>(base: u32) -> impl Parser<'a, S, u32>
 where
     S: Stream<Item = char>,
 {
@@ -278,6 +362,13 @@ where
     }
 }
 
+pub fn usize<S>(input: PState<'_, S>) -> PResult<'_, S, usize>
+where
+    S: Stream<Item = char>,
+{
+    lex_integer(10).map(|x| x as usize).parse(input)
+}
+
 fn lex_numeric<S>(input: PState<'_, S>) -> PResult<'_, S, char>
 where
     S: Stream<Item = char> + Copy,
@@ -286,8 +377,15 @@ where
     let (n, input) = lex_integer(base).parse(input)?;
     match char::from_u32(n) {
         Some(n) => Ok((n, input)),
-        None => Err((input.location, vec![]))
+        None => Err((input.location, vec![])),
     }
+}
+
+pub fn eol<S>(input: PState<'_, S>) -> PResult<'_, S, ()>
+where
+    S: Stream<Item = char>,
+{
+    char('\n').ignore().or(string("\r\n").ignore()).parse(input)
 }
 
 fn lex_char_e<S>(input: PState<'_, S>) -> PResult<'_, S, (char, bool)>
@@ -310,4 +408,134 @@ pub fn char_literal<S: Stream<Item = char>>(input: PState<'_, S>) -> PResult<'_,
     })
     .named("Char Literal")
     .parse(input)
+}
+
+pub fn any_with_escapes<S>(s: &str) -> impl Parser<'_, S, char>
+where
+    S: Stream<Item = char>,
+{
+    move |input| {
+        let (x, input) = none_of(s).parse(input)?;
+        if x == '\\' {
+            let (x, input) = any_single.parse(input)?;
+            match x {
+                'n' => Ok(('\n', input)),
+                'r' => Ok(('\r', input)),
+                't' => Ok(('\t', input)),
+                '\\' => Ok(('\\', input)),
+                '\'' => Ok(('\'', input)),
+                '\"' => Ok(('\"', input)),
+                '\0' => Ok(('\0', input)),
+                x => {
+                    if s.contains(x) {
+                        Ok((x, input))
+                    } else {
+                        Err((
+                            input.location,
+                            vec![Reason::Expected("Escape Character".to_string())],
+                        ))
+                    }
+                }
+            }
+        } else {
+            Ok((x, input))
+        }
+    }
+}
+
+/// Regex character classes
+pub mod class {
+    use crate::{
+        defs::{PResult, PState, Reason, Stream},
+        parsers::char::any_single,
+    };
+
+    pub fn word<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+    where
+        S: Stream<Item = char>,
+    {
+        let (x, input) = any_single(input)?;
+        if x.is_alphanumeric() || x == '_' {
+            Ok((x, input))
+        } else {
+            Err((input.location, Reason::expecteds("word character")))
+        }
+    }
+    pub fn not_word<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+    where
+        S: Stream<Item = char>,
+    {
+        let (x, input) = any_single(input)?;
+        if !x.is_alphanumeric() && x != '_' {
+            Ok((x, input))
+        } else {
+            Err((input.location, Reason::expecteds("not word character")))
+        }
+    }
+
+    pub fn digit<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+    where
+        S: Stream<Item = char>,
+    {
+        let (x, input) = any_single(input)?;
+        if x.is_ascii_digit() {
+            Ok((x, input))
+        } else {
+            Err((input.location, Reason::expecteds("digit character")))
+        }
+    }
+
+    pub fn not_digit<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+    where
+        S: Stream<Item = char>,
+    {
+        let (x, input) = any_single(input)?;
+        if !x.is_ascii_digit() {
+            Ok((x, input))
+        } else {
+            Err((input.location, Reason::expecteds("digit character")))
+        }
+    }
+
+    pub fn space<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+    where
+        S: Stream<Item = char>,
+    {
+        let (x, input) = any_single(input)?;
+        if x.is_whitespace() {
+            Ok((x, input))
+        } else {
+            Err((input.location, Reason::expecteds("digit character")))
+        }
+    }
+
+    pub fn not_space<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+    where
+        S: Stream<Item = char>,
+    {
+        let (x, input) = any_single(input)?;
+        if !x.is_whitespace() {
+            Ok((x, input))
+        } else {
+            Err((input.location, Reason::expecteds("digit character")))
+        }
+    }
+
+    pub fn word_boundary<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+    where
+        S: Stream<Item = char>,
+    {
+        let (x, input) = word(input)?;
+        let (_, _) = not_word(input)?;
+        Ok((x, input))
+    }
+
+    pub fn not_word_boundary<S>(input: PState<'_, S>) -> PResult<'_, S, char>
+    where
+        S: Stream<Item = char>,
+    {
+        let (_, input) = not_word(input)?;
+        let (x, input) = word(input)?;
+        Ok((x, input))
+    }
 }

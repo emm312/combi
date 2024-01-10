@@ -79,6 +79,24 @@ pub enum Reason {
     Message(String),
 }
 
+impl Reason {
+    pub fn expected(s: &str) -> Reason {
+        Self::Expected(s.to_string())
+    }
+    pub fn expecteds(s: &str) -> Vec<Reason> {
+        vec![Self::Expected(s.to_string())]
+    }
+    pub fn unexpected(s: &str) -> Reason {
+        Self::Unexpected(s.to_string())
+    }
+    pub fn unexpecteds(s: &str) -> Vec<Reason> {
+        vec![Self::Unexpected(s.to_string())]
+    }
+    pub fn message(s: &str) -> Reason {
+        Self::Message(s.to_string())
+    }
+}
+
 pub type PSuccess<'input, S, O> = (O, PState<'input, S>);
 pub type PFailure<'input> = (SourceLoc<'input>, Vec<Reason>);
 
@@ -153,7 +171,9 @@ pub fn pretty_print_error(error: &PFailure<'_>) -> String {
 }
 
 /// A general trait for parsers
-pub trait Parser<'a, S, T> {
+pub trait Parser<'a, S, T> 
+    where S: Stream + Copy
+{
     /// A direct implementation intended to be ran by other parsers.
     /// If intended to be ran directly by the user, instead use `parse`
     fn parse(&self, input: PState<'a, S>) -> PResult<'a, S, T>;
@@ -177,7 +197,7 @@ pub trait Parser<'a, S, T> {
         T: Debug,
     {
         match self.run_parser("<TEST>", input) {
-            Ok(x) => println!("Ok({:?})", x.0),
+            Ok(x) => println!("{:#?}", x.0),
             Err(e) => println!("{}", pretty_print_error(&e)),
         }
     }
@@ -244,6 +264,7 @@ pub trait Parser<'a, S, T> {
         }
     }
 
+    /// Places a result in the case of failure
     fn or_pure(&self, fallback: T) -> impl Parser<'a, S, T>
     where
         S: Copy,
@@ -251,7 +272,7 @@ pub trait Parser<'a, S, T> {
     {
         move |input| match self.parse(input) {
             Ok((x, xs)) => Ok((x, xs)),
-            Err(_) => Ok((fallback.clone(), input))
+            Err(_) => Ok((fallback.clone(), input)),
         }
     }
 
@@ -340,7 +361,7 @@ pub trait Parser<'a, S, T> {
     fn sep_by1<P, B>(&self, sep: &P) -> impl Parser<'a, S, Vec<T>>
     where
         P: Parser<'a, S, B>,
-        S: Copy,
+        S: Copy + Stream,
         Self: Sized,
     {
         move |input| {
@@ -350,18 +371,29 @@ pub trait Parser<'a, S, T> {
         }
     }
 
+    /// Parses 2 parsers and applies a function over their result
+    fn seq<F, P, B, C>(&self, p: P, f: F) -> impl Parser<'a, S, C>
+    where
+        F: Fn(T, B) -> C,
+        P: Parser<'a, S, B>,
+    {
+        move |input| {
+            let (a, input) = self.parse(input)?;
+            let (b, input) = p.parse(input)?;
+            Ok((f(a,b), input))
+        }
+    }
+
     /// Repeatedly parse `self` separated by `sep`
     fn sep_by<P, B>(&self, sep: &P) -> impl Parser<'a, S, Vec<T>>
     where
         P: Parser<'a, S, B>,
-        S: Copy,
+        S: Copy + Stream,
         Self: Sized,
     {
-        move |input| {
-            match self.sep_by1(sep).parse(input) {
-                Ok((x,xs)) => Ok((x,xs)),
-                Err(_) => Ok((vec![], input))
-            }
+        move |input| match self.sep_by1(sep).parse(input) {
+            Ok((x, xs)) => Ok((x, xs)),
+            Err(_) => Ok((vec![], input)),
         }
     }
 
@@ -423,9 +455,39 @@ pub trait Parser<'a, S, T> {
         }
     }
 
+    /// Makes it sure the parses uses all input
+    fn exhaustive(&self) -> impl Parser<'a, S, T>
+    where
+        S: Stream,
+    {
+        move |input| {
+            let (x, input) = self.parse(input)?;
+            let (_, input) = eof.parse(input)?;
+            Ok((x, input))
+        }
+    }
+
+    /// Repeatedly parses self `n` times
+    fn repeat_n(&self, n: usize) -> impl Parser<'a, S, Vec<T>>
+    where
+        S: Copy,
+    {
+        move |mut input| {
+            let mut matches = Vec::new();
+
+            for _ in 0..n {
+                let (x, new_input) = self.parse(input)?;
+                matches.push(x);
+                input = new_input;
+            }
+
+            Ok((matches, input))
+        }
+    }
+
     /// Creates a parser that parses a minumum of `min` times and a maximum of `max` times
-    fn count(&self, min: usize, max: usize) -> impl Parser<'a, S, Vec<T>> 
-    where 
+    fn count(&self, min: usize, max: usize) -> impl Parser<'a, S, Vec<T>>
+    where
         S: Copy,
     {
         move |mut input| {
@@ -442,7 +504,7 @@ pub trait Parser<'a, S, T> {
             if out.len() < min {
                 match self.parse(input) {
                     Ok(_) => panic!("Should not occur"),
-                    Err(e) => Err(e)
+                    Err(e) => Err(e),
                 }
             } else {
                 Ok((out, input))
@@ -454,6 +516,7 @@ pub trait Parser<'a, S, T> {
 impl<'a, S, T, F> Parser<'a, S, T> for F
 where
     F: Fn(PState<'a, S>) -> PResult<'a, S, T>,
+    S: Stream,
 {
     fn parse(&self, state: PState<'a, S>) -> PResult<'a, S, T> {
         self(state)
@@ -469,6 +532,7 @@ pub struct LabeledParser<P> {
 impl<'a, S, T, P> Parser<'a, S, T> for Rc<P>
 where
     P: Parser<'a, S, T>,
+    S: Stream
 {
     fn parse(&self, state: PState<'a, S>) -> PResult<'a, S, T> {
         let x: &P = self.borrow();
@@ -479,6 +543,7 @@ where
 impl<'a, S, T, P> Parser<'a, S, T> for LabeledParser<P>
 where
     P: Parser<'a, S, T>,
+    S: Stream
 {
     fn parse(&self, state: PState<'a, S>) -> PResult<'a, S, T> {
         let mut res = self.parser.parse(state);
@@ -503,7 +568,7 @@ impl ParserFail {
     }
 }
 
-impl<'a, S, T> Parser<'a, S, T> for ParserFail {
+impl<'a, S: Stream, T> Parser<'a, S, T> for ParserFail {
     fn parse(&self, state: PState<'a, S>) -> PResult<'a, S, T> {
         Err((state.location, vec![Reason::Message(self.message.clone())]))
     }
@@ -521,7 +586,7 @@ impl<T> ParserPure<T> {
     }
 }
 
-impl<'a, S, T: Clone> Parser<'a, S, T> for ParserPure<T> {
+impl<'a, S: Stream, T: Clone> Parser<'a, S, T> for ParserPure<T> {
     fn parse(&self, state: PState<'a, S>) -> PResult<'a, S, T> {
         Ok((self.item.clone(), state))
     }
@@ -534,7 +599,7 @@ where
     S: Stream,
 {
     if state.input.uncons().is_some() {
-        Err((state.location, vec![Reason::Expected("EOF".to_string())]))
+        Err((state.location, vec![Reason::expected("EOF")]))
     } else {
         Ok(((), state))
     }

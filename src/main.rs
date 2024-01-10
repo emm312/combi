@@ -1,3 +1,4 @@
+
 use combi::defs::eof;
 use combi::defs::Parser;
 use combi::parsers::byte::byte_p;
@@ -40,4 +41,7 @@ fn main() {
     eof.test_parse("");
     println!("-----");
     char_literal.test_parse("\\\"");
+    println!("-----");
+    range('a'..='a').test_parse("b");
+
 }
