@@ -30,7 +30,7 @@ impl Stream for &str {
 
     fn uncons(self) -> Option<(Self::Item, Self)> {
         let c = self.chars().next()?;
-        Some((c, &self[1..]))
+        Some((c, &self[c.len_utf8()..]))
     }
 }
 

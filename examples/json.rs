@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 
 use combi::defs::{PResult, PState, Parser, Stream};
 use combi::parsers::char::*;
@@ -110,6 +111,8 @@ where
 
 fn main() -> std::io::Result<()> {
     let file = std::fs::read_to_string("./examples/sample.json")?;
+    let instant = Instant::now();
     json_object.test_parse(file.as_str());
+    //println!("{:#?}mb/s", instant.elapsed().as_millis()*1000/(file.len() as f64/1024.0/1024.0) as u128);
     Ok(())
 }
