@@ -8,7 +8,7 @@ use combi::parsers::char::*;
 pub enum JsonObject {
     Map(HashMap<String, JsonObject>),
     Array(Vec<JsonObject>),
-    Num(i64),
+    Num(f64),
     String(String),
     Bool(bool),
     Null,
@@ -42,7 +42,7 @@ fn num<S>(input: PState<'_, S>) -> PResult<'_, S, JsonObject>
 where
     S: Stream<Item = char>,
 {
-    int.map(JsonObject::Num).parse(input)
+    float.map(JsonObject::Num).parse(input)
 }
 
 fn string_literal<S>(input: PState<'_, S>) -> PResult<'_, S, String>
@@ -111,8 +111,13 @@ where
 
 fn main() -> std::io::Result<()> {
     let file = std::fs::read_to_string("./examples/sample.json")?;
-    let instant = Instant::now();
-    json_object.test_parse(file.as_str());
-    //println!("{:#?}mb/s", instant.elapsed().as_millis()*1000/(file.len() as f64/1024.0/1024.0) as u128);
+    // let file_size = file.len() as f64 / 1000.0 / 1000.0;
+    // let instant = Instant::now();
+    json_object.lexeme().exhaustive().test_parse(file.as_str());
+    // let elapsed_ms = instant.elapsed().as_millis();
+    // let elapsed_seconds = elapsed_ms as f64 / 1000.0;
+    // println!("{}mb/s", file_size/elapsed_seconds);
+    // println!("{} bytes", file.len());
+    // println!("{} ms", elapsed_ms);
     Ok(())
 }

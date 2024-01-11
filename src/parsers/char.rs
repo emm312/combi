@@ -133,7 +133,7 @@ where
 /// Parses any single character `c`
 pub fn char<'input, S>(c: char) -> impl Parser<'input, S, char>
 where
-    S: Stream<Item = char> + 'input,
+    S: Stream<Item = char>,
 {
     satisfy(move |x| x == c).named(c)
 }
@@ -313,6 +313,25 @@ pub fn int<S: Stream<Item = char>>(state: PState<'_, S>) -> PResult<'_, S, i64> 
     })
     .named("Integer")
     .parse(state)
+}
+
+pub fn float<S: Stream<Item = char>>(input: PState<'_, S>) -> PResult<'_, S, f64> {
+    (move |state| {
+        let (x, state) = char('-').opt().parse(state)?;
+        let neg = x.is_some();
+
+        let (x, state) = digit.or(char('.')).some().parse(state)?;
+
+        let mut n: f64 = x.into_iter().collect::<String>().parse().unwrap();
+
+        if neg {
+            n *= -1.0;
+        }
+
+        Ok((n, state))
+    })
+    .named("Float")
+    .parse(input)
 }
 
 fn lex_esc_char<S>(input: PState<'_, S>) -> PResult<'_, S, char>

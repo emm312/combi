@@ -51,6 +51,4 @@ fn main() {
     eof.test_parse("");
     println!("-----");
     char_literal.test_parse("\\\"");
-    println!("-----");
-    range('a'..='a').test_parse("b");
 }
