@@ -1,6 +1,7 @@
-
 use combi::defs::eof;
+use combi::defs::Branching;
 use combi::defs::Parser;
+use combi::defs::Sequential;
 use combi::parsers::byte::byte_p;
 use combi::parsers::char::*;
 
@@ -11,11 +12,20 @@ fn main() {
     println!("-----");
     char('f').or(char('o')).test_parse("loo");
     println!("-----");
-    char('f').and_then(char('o')).and_then(char('o')).test_parse("foo");
+    char('f')
+        .and_then(char('o'))
+        .and_then(char('o'))
+        .test_parse("foo");
     println!("-----");
-    char('f').and_then(char('o')).and_then(char('o')).test_parse("bar");
+    char('f')
+        .and_then(char('o'))
+        .and_then(char('o'))
+        .test_parse("bar");
     println!("-----");
-    char('f').and_then(char('o')).and_then(char('o')).test_parse("far");
+    char('f')
+        .and_then(char('o'))
+        .and_then(char('o'))
+        .test_parse("far");
     println!("====");
     let xs: &[u8] = &[23, 34, 54];
     byte_p(23).or(byte_p(34)).test_parse(xs);
@@ -43,5 +53,4 @@ fn main() {
     char_literal.test_parse("\\\"");
     println!("-----");
     range('a'..='a').test_parse("b");
-
 }

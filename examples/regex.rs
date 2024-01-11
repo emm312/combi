@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use combi::{
-    defs::{eof, pretty_print_error, PResult, PState, Parser, Reason},
+    defs::{eof, pretty_print_error, PResult, PState, Parser, Reason, Branching, Repeating, Sequential},
     parsers::char::*,
 };
 

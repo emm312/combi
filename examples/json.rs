@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use combi::defs::{PResult, PState, Parser, Stream};
+use combi::defs::{PResult, PState, Parser, Stream, Branching, Sequential, Repeating};
 use combi::parsers::char::*;
 
 #[derive(Debug, Clone)]

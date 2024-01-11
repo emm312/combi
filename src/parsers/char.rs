@@ -133,9 +133,9 @@ where
 /// Parses any single character `c`
 pub fn char<'input, S>(c: char) -> impl Parser<'input, S, char>
 where
-    S: Stream<Item = char>,
+    S: Stream<Item = char> + 'input,
 {
-    satisfy(move |x| x == c).named(&c.to_string())
+    satisfy(move |x| x == c).named(c)
 }
 
 /// Parses any single character but `c`
@@ -143,7 +143,7 @@ pub fn not_char<'input, S>(c: char) -> impl Parser<'input, S, char>
 where
     S: Stream<Item = char>,
 {
-    satisfy(move |x| x != c).named(&format!("not({c})"))
+    satisfy(move |x| x != c).named(format!("not({c})"))
 }
 
 pub fn succ(c: char) -> char {
