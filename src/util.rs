@@ -1,6 +1,6 @@
 use std::{collections::HashSet, hash::Hash};
 
-pub struct Dedup<I>
+pub struct Dedup_<I>
 where
     I: Iterator,
 {
@@ -8,7 +8,7 @@ where
     set: HashSet<I::Item>,
 }
 
-impl<I> Iterator for Dedup<I>
+impl<I> Iterator for Dedup_<I>
 where
     I: Iterator,
     I::Item: Eq + Hash + Clone,
@@ -27,16 +27,16 @@ where
     }
 }
 
-pub trait DedupI: Iterator {
-    fn dedup(self) -> Dedup<Self>
+pub trait Dedup: Iterator {
+    fn dedup(self) -> Dedup_<Self>
     where
         Self: Sized,
     {
-        Dedup {
+        Dedup_ {
             iter: self,
             set: HashSet::new(),
         }
     }
 }
 
-impl<I: Iterator> DedupI for I {}
+impl<I: Iterator> Dedup for I {}

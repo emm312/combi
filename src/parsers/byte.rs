@@ -38,7 +38,7 @@ pub fn byte_p<'input, S>(c: u8) -> impl Parser<'input, S, u8>
 where
     S: Stream<Item = u8>,
 {
-    satisfy(move |x| x == c).named(&format!("{c}"))
+    satisfy(move |x| x == c).named(format!("{c}"))
 }
 
 pub fn bytes_p<'input, S>(s: &'input [u8]) -> impl Parser<'input, S, &'input [u8]>
@@ -67,5 +67,5 @@ where
         }
         Ok((s, input))
     })
-    .named(&format!("{s:?}"))
+    .named(format!("{s:?}"))
 }
